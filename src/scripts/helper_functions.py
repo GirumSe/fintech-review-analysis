@@ -1,5 +1,7 @@
 import pandas as pd
 from google_play_scraper import reviews, Sort
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
+import nltk
 import logging
 
 BANK_APPS = {
@@ -13,6 +15,8 @@ CLEANED_DATA_PATH = "data/reviews_cleaned.csv"
 SENTIMENT_SAMPLE_PATH = "data/sentiment_sample.csv"
 
 logging.basicConfig(level=logging.INFO)
+
+nltk.download('vader_lexicon')
 
 def scrape_reviews_per_bank(count: int = 400) -> pd.DataFrame:
     """Scrapes reviews for defined banks from Google Play Store."""
@@ -58,4 +62,25 @@ def clean_reviews() -> pd.DataFrame:
 
     df.to_csv(CLEANED_DATA_PATH, index=False)
     logging.info(f"Cleaned {initial} ➜ {len(df)} reviews. Saved to {CLEANED_DATA_PATH}")
+    return df
+
+def label_sentiment(score: float) -> str:
+    """Returns sentiment label based on compound score."""
+    if score > 0.2:
+        return "positive"
+    elif score < -0.2:
+        return "negative"
+    return "neutral"
+
+def analyze_sentiment(bank: str = "CBE") -> pd.DataFrame:
+    """Performs sentiment analysis on reviews for a given bank."""
+    df = pd.read_csv(CLEANED_DATA_PATH)
+    df = df[df["bank"] == bank].copy()
+
+    sid = SentimentIntensityAnalyzer()
+    df["sentiment_score"] = df["review"].apply(lambda x: sid.polarity_scores(x)["compound"])
+    df["sentiment_label"] = df["sentiment_score"].apply(label_sentiment)
+
+    df.to_csv(SENTIMENT_SAMPLE_PATH, index=False)
+    logging.info(f"Saved sentiment-labeled reviews to {SENTIMENT_SAMPLE_PATH}")
     return df
